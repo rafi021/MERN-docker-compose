@@ -1,0 +1,67 @@
+services:
+  backend:
+    build:
+      context: ./mern/backend
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGO_URI: mongodb://mongodb:27017/mydatabase
+    ports:
+      - "5000:5000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:5000/record"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - mern_network
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: always
+
+  frontend:
+    build:
+      context: ./mern/frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_BASE_URL: http://backend:5000
+    ports:
+      - "80:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - mern_network
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: always
+
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    networks:
+      - mern_network
+    volumes:
+      - mongo-data:/data/db
+    restart: always
+
+networks:
+  mern_network:
+    driver: bridge
+
+volumes:
+  mongo-data:
