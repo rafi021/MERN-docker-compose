@@ -1,23 +1,29 @@
-FROM node:22-alpine
-
-ENV NODE_ENV=production
-
+# syntax=docker/dockerfile:1.7
+FROM oven/bun:1-alpine AS base
 WORKDIR /app
 
-# Copy lockfile and package manifest first for better cache reuse.
-COPY package*.json ./
+# ── Stage: install prod deps only ──────────────────────────────────────────────
+FROM base AS deps
+COPY package.json bun.lock ./
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun install --frozen-lockfile --production
 
-# Deterministic, production-only dependency install.
-RUN npm ci --omit=dev --no-audit --fund=false
+# ── Stage: final runtime image ─────────────────────────────────────────────────
+FROM base AS release
+ENV NODE_ENV=production
 
+# Copy production node_modules from deps stage
+COPY --from=deps /app/node_modules ./node_modules
+
+# Copy application source
 COPY . .
 
-RUN chown -R node:node /app
-USER node
+# Drop to non-root bun user
+USER bun
 
 EXPOSE 5000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD wget -q -O /dev/null http://127.0.0.1:5000/record || exit 1
 
-CMD ["node", "server.js"]
+CMD ["bun", "run", "server.js"]

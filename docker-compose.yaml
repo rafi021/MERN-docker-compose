@@ -3,6 +3,7 @@ services:
     build:
       context: ./mern/backend
       dockerfile: Dockerfile
+      network: host
     environment:
       NODE_ENV: production
       PORT: 5000
@@ -26,6 +27,7 @@ services:
     build:
       context: ./mern/frontend
       dockerfile: Dockerfile
+      network: host
       args:
         VITE_BASE_URL: http://backend:5000
     ports:
